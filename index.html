@@ -3613,19 +3613,33 @@ RKS Liblice 2, Tower North
         markers[data.id] = { marker: marker, data: data };
       });
 
+      let tempPopup;
       map.on("click", function(e) {
-        const layer = prompt("Do której warstwy dodać pinezkę?");
-        if (!layer) return;
-        const name = prompt("Nazwa miejsca:");
-        if (!name) return;
-        const desc = prompt("Opis:");
-        const id = "pin" + Date.now();
-        const data = { id, name, description: desc, lat: e.latlng.lat, lng: e.latlng.lng, layer };
-        if (!layers[layer]) layers[layer] = L.layerGroup().addTo(map);
-        const marker = L.marker([data.lat, data.lng]).bindPopup("<b>" + data.name + "</b><br>" + data.description);
-        marker.addTo(layers[layer]);
-        markers[id] = { marker, data };
-        refreshLayerPanel();
+        if (tempPopup) map.closePopup(tempPopup);
+        const container = document.createElement("div");
+        container.innerHTML = `
+          <b>📍 Dodać pinezkę?</b><br>
+          <button id="confirmAddPin">Tak</button>
+        `;
+        tempPopup = L.popup()
+          .setLatLng(e.latlng)
+          .setContent(container)
+          .openOn(map);
+        document.getElementById("confirmAddPin").onclick = () => {
+          map.closePopup(tempPopup);
+          const layer = prompt("Do której warstwy dodać pinezkę?");
+          if (!layer) return;
+          const name = prompt("Nazwa miejsca:");
+          if (!name) return;
+          const desc = prompt("Opis:");
+          const id = "pin" + Date.now();
+          const data = { id, name, description: desc, lat: e.latlng.lat, lng: e.latlng.lng, layer };
+          if (!layers[layer]) layers[layer] = L.layerGroup().addTo(map);
+          const marker = L.marker([data.lat, data.lng]).bindPopup("<b>" + data.name + "</b><br>" + data.description);
+          marker.addTo(layers[layer]);
+          markers[id] = { marker, data };
+          refreshLayerPanel();
+        };
       });
 
       refreshLayerPanel();
