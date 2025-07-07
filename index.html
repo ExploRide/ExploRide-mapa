@@ -1,32 +1,41 @@
+
 <!DOCTYPE html>
 <html>
 <head>
-  <meta charset="utf-8" />
+  <meta charset="utf-8">
   <title>ExploRide – Wielka Mapa Urbexu</title>
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <style>
-    html, body, #map { height: 100%; margin: 0; }
-    #map, #layers { display: none; }
+    html, body, #map { height: 100%; margin: 0; padding: 0; }
+    #map, #layers, #adminPanel { display: none; }
     #layers {
       position: absolute;
-      top: 70px;
+      top: 60px;
       left: 10px;
       z-index: 1000;
       background: rgba(255,255,255,0.95);
       padding: 10px;
-      border-radius: 5px;
+      border-radius: 6px;
       font-family: sans-serif;
-      box-shadow: 0 0 5px rgba(0,0,0,0.3);
-      max-height: 90vh;
+      box-shadow: 0 0 6px rgba(0,0,0,0.3);
+      max-height: 85vh;
       overflow-y: auto;
-      width: 250px;
+      width: 300px;
     }
-    .layer-group { margin-bottom: 10px; }
-    .layer-title { font-weight: bold; cursor: pointer; margin-top: 5px; }
+    #adminPanel {
+      position: absolute;
+      top: 10px;
+      left: 10px;
+      z-index: 2000;
+      background: white;
+      padding: 10px;
+      border-radius: 6px;
+      box-shadow: 0 0 6px rgba(0,0,0,0.3);
+    }
+    #login { position: absolute; top: 20px; left: 20px; z-index: 3000; }
+    .layer-title { font-weight: bold; cursor: pointer; margin-top: 8px; }
     .layer-items { margin-left: 10px; display: none; }
-    .layer-items div { cursor: pointer; padding: 2px 0; font-size: 14px; color: #0077cc; }
-    .layer-items div:hover { text-decoration: underline; }
-    #login { position: absolute; top: 20px; left: 20px; z-index: 2000; }
+    .pin-entry { font-size: 14px; margin-bottom: 6px; }
   </style>
   <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.3/dist/leaflet.css" />
   <script src="https://unpkg.com/leaflet@1.9.3/dist/leaflet.js"></script>
@@ -49,83 +58,142 @@
     const provider = new GoogleAuthProvider();
 
     document.getElementById("login").onclick = () => {
-      signInWithPopup(auth, provider)
-        .catch(error => alert("Błąd logowania: " + error.message));
+      signInWithPopup(auth, provider).catch(e => alert("Błąd logowania: " + e.message));
+    };
+
+    const markerData = [
+      { id: "punkt1", name: "🏚 Stara Willa", description: "Ostatnia eksploracja", lat: 50.123, lng: 19.456, layer: "Domy" },
+      { id: "punkt2", name: "🏭 Fabryka Widmo", description: "Straszny klimat!", lat: 50.789, lng: 18.456, layer: "Fabryki" },
+      { id: "punkt3", name: "🏰 Schron Bojowy", description: "Zamurowane wejście", lat: 50.456, lng: 19.123, layer: "Bunkry" }
+    ];
+
+    const map = L.map('map').setView([50.3, 19.2], 6);
+    L.tileLayer('https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}', {
+      attribution: 'Tiles © Esri'
+    }).addTo(map);
+
+    const layers = {};
+    const markers = {};
+
+    function refreshLayerPanel() {
+      const layersDiv = document.getElementById("layers");
+      layersDiv.innerHTML = "";
+      for (const [layerName, group] of Object.entries(layers)) {
+        const title = document.createElement("div");
+        title.className = "layer-title";
+        title.textContent = layerName;
+        const list = document.createElement("div");
+        list.className = "layer-items";
+
+        for (const id in markers) {
+          const pin = markers[id];
+          if (pin.data.layer === layerName) {
+            const row = document.createElement("div");
+            row.className = "pin-entry";
+            row.innerHTML = `
+              <input value="${pin.data.name}" onchange="editMarker('${id}', 'name', this.value)" />
+              <input value="${pin.data.description}" onchange="editMarker('${id}', 'description', this.value)" />
+              <select onchange="moveMarker('${id}', this.value)">
+                <option disabled selected>Przenieś do...</option>
+                ${Object.keys(layers).map(l => l !== layerName ? `<option value="${l}">${l}</option>` : '').join('')}
+              </select>`;
+            list.appendChild(row);
+          }
+        }
+
+        title.onclick = () => {
+          list.style.display = list.style.display === "none" ? "block" : "none";
+        };
+
+        layersDiv.appendChild(title);
+        layersDiv.appendChild(list);
+      }
+    }
+
+    function initApp() {
+      document.getElementById("map").style.display = "block";
+      document.getElementById("layers").style.display = "block";
+      document.getElementById("adminPanel").style.display = "block";
+
+      markerData.forEach(data => {
+        if (!layers[data.layer]) {
+          layers[data.layer] = L.layerGroup().addTo(map);
+        }
+        const marker = L.marker([data.lat, data.lng]).bindPopup("<b>" + data.name + "</b><br>" + data.description);
+        marker.addTo(layers[data.layer]);
+        markers[data.id] = { marker: marker, data: data };
+      });
+
+      map.on("click", function(e) {
+        const layer = prompt("Do której warstwy dodać pinezkę?");
+        if (!layer) return;
+        const name = prompt("Nazwa miejsca:");
+        if (!name) return;
+        const desc = prompt("Opis:");
+        const id = "pin" + Date.now();
+        const data = { id, name, description: desc, lat: e.latlng.lat, lng: e.latlng.lng, layer };
+        if (!layers[layer]) layers[layer] = L.layerGroup().addTo(map);
+        const marker = L.marker([data.lat, data.lng]).bindPopup("<b>" + data.name + "</b><br>" + data.description);
+        marker.addTo(layers[layer]);
+        markers[id] = { marker, data };
+        refreshLayerPanel();
+      });
+
+      refreshLayerPanel();
+    }
+
+    window.moveMarker = function(id, newLayer) {
+      const item = markers[id];
+      const oldLayer = item.data.layer;
+      if (layers[oldLayer]) layers[oldLayer].removeLayer(item.marker);
+      if (!layers[newLayer]) layers[newLayer] = L.layerGroup().addTo(map);
+      layers[newLayer].addLayer(item.marker);
+      item.data.layer = newLayer;
+      refreshLayerPanel();
+    };
+
+    window.editMarker = function(id, field, value) {
+      const item = markers[id];
+      item.data[field] = value;
+      item.marker.bindPopup("<b>" + item.data.name + "</b><br>" + item.data.description);
+    };
+
+    window.exportToKML = function() {
+      const kmlHeader = `<?xml version="1.0" encoding="UTF-8"?>
+        <kml xmlns="http://www.opengis.net/kml/2.2"><Document>`;
+      const kmlFooter = "</Document></kml>";
+      const placemarks = Object.values(markers).map(m => `
+        <Placemark>
+          <name>${m.data.name}</name>
+          <description>${m.data.description}</description>
+          <ExtendedData><Data name="layer"><value>${m.data.layer}</value></Data></ExtendedData>
+          <Point><coordinates>${m.data.lng},${m.data.lat},0</coordinates></Point>
+        </Placemark>`).join("\n");
+      const kml = kmlHeader + placemarks + kmlFooter;
+      const blob = new Blob([kml], { type: "application/vnd.google-earth.kml+xml" });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement("a");
+      a.href = url;
+      a.download = "ExploRide-export.kml";
+      a.click();
     };
 
     onAuthStateChanged(auth, user => {
       if (user && user.email === "eksplorajder@gmail.com") {
         document.getElementById("login").style.display = "none";
-        document.getElementById("map").style.display = "block";
-        document.getElementById("layers").style.display = "block";
-        initMap(); // startuje mapę
+        initApp();
       } else if (user) {
-        document.body.innerHTML = "<h2 style='text-align:center; margin-top:20vh;'>⛔️ Brak dostępu dla " + user.email + "</h2>";
+        document.body.innerHTML = "<h2 style='text-align:center;margin-top:20vh;'>⛔ Brak dostępu dla " + user.email + "</h2>";
       }
     });
-
-    function initMap() {
-      const map = L.map('map').setView([50.3, 19.2], 6);
-      L.tileLayer('https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}', {
-        attribution: 'Tiles © Esri'
-      }).addTo(map);
-
-      const layersControl = {};
-      const markersByLayer = {};
-
-      fetch('exploride_map.geojson')
-        .then(res => res.json())
-        .then(data => {
-          data.features.forEach(feature => {
-            const layerName = feature.properties.layer || "Inne";
-            if (!layersControl[layerName]) {
-              layersControl[layerName] = L.layerGroup().addTo(map);
-              markersByLayer[layerName] = [];
-            }
-            const marker = L.geoJSON(feature, {
-              onEachFeature: (feature, layer) => {
-                const content = "<b>" + (feature.properties.name || "") + "</b><br>" + (feature.properties.description || "");
-                layer.bindPopup(content);
-                markersByLayer[layerName].push({ marker: layer, name: feature.properties.name || "Bez nazwy" });
-              }
-            });
-            marker.addTo(layersControl[layerName]);
-          });
-
-          const layersDiv = document.getElementById("layers");
-          Object.keys(layersControl).forEach(layerName => {
-            const groupDiv = document.createElement("div");
-            groupDiv.className = "layer-group";
-
-            const title = document.createElement("span");
-            title.className = "layer-title";
-            title.innerText = layerName;
-            title.onclick = () => {
-              itemsDiv.style.display = itemsDiv.style.display === "none" ? "block" : "none";
-            };
-
-            const itemsDiv = document.createElement("div");
-            itemsDiv.className = "layer-items";
-            markersByLayer[layerName].forEach(obj => {
-              const item = document.createElement("div");
-              item.innerText = obj.name;
-              item.onclick = () => {
-                map.setView(obj.marker.getLatLng(), 17);
-                obj.marker.openPopup();
-              };
-              itemsDiv.appendChild(item);
-            });
-
-            groupDiv.appendChild(title);
-            groupDiv.appendChild(itemsDiv);
-            layersDiv.appendChild(groupDiv);
-          });
-        });
-    }
   </script>
 </head>
 <body>
   <button id="login">🔐 Zaloguj się przez Google</button>
+  <div id="adminPanel">
+    <button onclick="exportToKML()">💾 Eksportuj do KML</button>
+    <p>Kliknij na mapę, aby dodać nową pinezkę</p>
+  </div>
   <div id="layers"></div>
   <div id="map"></div>
 </body>
