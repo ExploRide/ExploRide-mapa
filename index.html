@@ -1,0 +1,132 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="utf-8" />
+  <title>ExploRide – Wielka Mapa Urbexu</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <style>
+    html, body, #map { height: 100%; margin: 0; }
+    #map, #layers { display: none; }
+    #layers {
+      position: absolute;
+      top: 70px;
+      left: 10px;
+      z-index: 1000;
+      background: rgba(255,255,255,0.95);
+      padding: 10px;
+      border-radius: 5px;
+      font-family: sans-serif;
+      box-shadow: 0 0 5px rgba(0,0,0,0.3);
+      max-height: 90vh;
+      overflow-y: auto;
+      width: 250px;
+    }
+    .layer-group { margin-bottom: 10px; }
+    .layer-title { font-weight: bold; cursor: pointer; margin-top: 5px; }
+    .layer-items { margin-left: 10px; display: none; }
+    .layer-items div { cursor: pointer; padding: 2px 0; font-size: 14px; color: #0077cc; }
+    .layer-items div:hover { text-decoration: underline; }
+    #login { position: absolute; top: 20px; left: 20px; z-index: 2000; }
+  </style>
+  <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.3/dist/leaflet.css" />
+  <script src="https://unpkg.com/leaflet@1.9.3/dist/leaflet.js"></script>
+  <script type="module">
+    import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-app.js";
+    import { getAuth, GoogleAuthProvider, signInWithPopup, onAuthStateChanged } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-auth.js";
+
+    const firebaseConfig = {
+      apiKey: "AIzaSyBj8xPy81NaxFwHmBL3ni_UVjYKFZflyv0",
+      authDomain: "exploridemap.firebaseapp.com",
+      projectId: "exploridemap",
+      storageBucket: "exploridemap.firebasestorage.app",
+      messagingSenderId: "1074659589759",
+      appId: "1:1074659589759:web:f8bdffc15d41d47ac8094a",
+      measurementId: "G-2JHQZ6HXTM"
+    };
+
+    const app = initializeApp(firebaseConfig);
+    const auth = getAuth();
+    const provider = new GoogleAuthProvider();
+
+    document.getElementById("login").onclick = () => {
+      signInWithPopup(auth, provider)
+        .catch(error => alert("Błąd logowania: " + error.message));
+    };
+
+    onAuthStateChanged(auth, user => {
+      if (user && user.email === "eksplorajder@gmail.com") {
+        document.getElementById("login").style.display = "none";
+        document.getElementById("map").style.display = "block";
+        document.getElementById("layers").style.display = "block";
+        initMap(); // startuje mapę
+      } else if (user) {
+        document.body.innerHTML = "<h2 style='text-align:center; margin-top:20vh;'>⛔️ Brak dostępu dla " + user.email + "</h2>";
+      }
+    });
+
+    function initMap() {
+      const map = L.map('map').setView([50.3, 19.2], 6);
+      L.tileLayer('https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}', {
+        attribution: 'Tiles © Esri'
+      }).addTo(map);
+
+      const layersControl = {};
+      const markersByLayer = {};
+
+      fetch('exploride_map.geojson')
+        .then(res => res.json())
+        .then(data => {
+          data.features.forEach(feature => {
+            const layerName = feature.properties.layer || "Inne";
+            if (!layersControl[layerName]) {
+              layersControl[layerName] = L.layerGroup().addTo(map);
+              markersByLayer[layerName] = [];
+            }
+            const marker = L.geoJSON(feature, {
+              onEachFeature: (feature, layer) => {
+                const content = "<b>" + (feature.properties.name || "") + "</b><br>" + (feature.properties.description || "");
+                layer.bindPopup(content);
+                markersByLayer[layerName].push({ marker: layer, name: feature.properties.name || "Bez nazwy" });
+              }
+            });
+            marker.addTo(layersControl[layerName]);
+          });
+
+          const layersDiv = document.getElementById("layers");
+          Object.keys(layersControl).forEach(layerName => {
+            const groupDiv = document.createElement("div");
+            groupDiv.className = "layer-group";
+
+            const title = document.createElement("span");
+            title.className = "layer-title";
+            title.innerText = layerName;
+            title.onclick = () => {
+              itemsDiv.style.display = itemsDiv.style.display === "none" ? "block" : "none";
+            };
+
+            const itemsDiv = document.createElement("div");
+            itemsDiv.className = "layer-items";
+            markersByLayer[layerName].forEach(obj => {
+              const item = document.createElement("div");
+              item.innerText = obj.name;
+              item.onclick = () => {
+                map.setView(obj.marker.getLatLng(), 17);
+                obj.marker.openPopup();
+              };
+              itemsDiv.appendChild(item);
+            });
+
+            groupDiv.appendChild(title);
+            groupDiv.appendChild(itemsDiv);
+            layersDiv.appendChild(groupDiv);
+          });
+        });
+    }
+  </script>
+</head>
+<body>
+  <button id="login">🔐 Zaloguj się przez Google</button>
+  <div id="layers"></div>
+  <div id="map"></div>
+</body>
+</html>
