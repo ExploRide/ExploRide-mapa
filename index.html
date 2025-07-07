@@ -3693,10 +3693,10 @@ RKS Liblice 2, Tower North
       a.click();
     };
 
-    // initApp(); //
+    // window.onload = initApp; //
       if (user && user.email === "eksplorajder@gmail.com") {
         
-        initApp();
+        window.onload = initApp;
       } else if (user) {
         document.body.innerHTML = "<h2 style='text-align:center;margin-top:20vh;'>⛔ Brak dostępu dla " + user.email + "</h2>";
       }
