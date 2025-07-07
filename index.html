@@ -2,22 +2,21 @@
 <!DOCTYPE html>
 <html>
 <head>
-  <title>ExploRide – Wielka Mapa Urbexu</title>
+  <title>ExploRide – Mapa Testowa</title>
   <meta charset="utf-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <style>
-    html, body, #map {
-      height: 100%;
-      margin: 0;
-      padding: 0;
-    }
-  </style>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <link
     rel="stylesheet"
     href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"
     integrity="sha256-sA+e2myLs9xVM7zvibIOtKpFQdlES9y6WGHGZ6bYwYQ="
     crossorigin=""
   />
+  <style>
+    html, body, #map {
+      height: 100%;
+      margin: 0;
+    }
+  </style>
 </head>
 <body>
   <div id="map"></div>
@@ -27,13 +26,15 @@
     crossorigin=""
   ></script>
   <script>
-    const map = L.map('map').setView([52.2297, 21.0122], 6);
+    const map = L.map('map').setView([52.2297, 21.0122], 10); // Warszawa
+
     L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
-      maxZoom: 19,
+      maxZoom: 18,
       attribution: '&copy; OpenStreetMap contributors'
     }).addTo(map);
 
-    L.marker([52.2297, 21.0122]).addTo(map)
+    L.marker([52.2297, 21.0122])
+      .addTo(map)
       .bindPopup('Warszawa')
       .openPopup();
   </script>
