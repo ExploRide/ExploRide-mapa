@@ -7,7 +7,7 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <style>
     html, body, #map { height: 100%; margin: 0; padding: 0; }
-    #map, #layers, #adminPanel { display: none; }
+    #map, #layers, #adminPanel, #editPanel { display: none; }
     #layers {
       position: absolute;
       top: 60px;
@@ -20,7 +20,7 @@
       box-shadow: 0 0 6px rgba(0,0,0,0.3);
       max-height: 85vh;
       overflow-y: auto;
-      width: 300px;
+      width: 280px;
     }
     #adminPanel {
       position: absolute;
@@ -32,10 +32,30 @@
       border-radius: 6px;
       box-shadow: 0 0 6px rgba(0,0,0,0.3);
     }
+    #editPanel {
+      position: absolute;
+      top: 60px;
+      right: 10px;
+      z-index: 1500;
+      background: white;
+      padding: 10px;
+      width: 250px;
+      border-radius: 6px;
+      box-shadow: 0 0 6px rgba(0,0,0,0.3);
+      font-family: sans-serif;
+    }
     #login { position: absolute; top: 20px; left: 20px; z-index: 3000; }
-    .layer-title { font-weight: bold; cursor: pointer; margin-top: 8px; }
+    .layer-title {
+      font-weight: bold;
+      cursor: pointer;
+      margin-top: 8px;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+    }
     .layer-items { margin-left: 10px; display: none; }
-    .pin-entry { font-size: 14px; margin-bottom: 6px; }
+    .pin-entry { font-size: 14px; margin-bottom: 6px; display: flex; justify-content: space-between; }
+    .pin-name { max-width: 150px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
   </style>
   <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.3/dist/leaflet.css" />
   <script src="https://unpkg.com/leaflet@1.9.3/dist/leaflet.js"></script>
@@ -74,6 +94,7 @@
 
     const layers = {};
     const markers = {};
+    let currentEditId = null;
 
     function refreshLayerPanel() {
       const layersDiv = document.getElementById("layers");
@@ -81,7 +102,8 @@
       for (const [layerName, group] of Object.entries(layers)) {
         const title = document.createElement("div");
         title.className = "layer-title";
-        title.textContent = layerName;
+        const toggle = document.createElement("span");
+        toggle.textContent = "🔽";
         const list = document.createElement("div");
         list.className = "layer-items";
 
@@ -90,21 +112,18 @@
           if (pin.data.layer === layerName) {
             const row = document.createElement("div");
             row.className = "pin-entry";
-            row.innerHTML = `
-              <input value="${pin.data.name}" onchange="editMarker('${id}', 'name', this.value)" />
-              <input value="${pin.data.description}" onchange="editMarker('${id}', 'description', this.value)" />
-              <select onchange="moveMarker('${id}', this.value)">
-                <option disabled selected>Przenieś do...</option>
-                ${Object.keys(layers).map(l => l !== layerName ? `<option value="${l}">${l}</option>` : '').join('')}
-              </select>`;
+            row.innerHTML = `<span class="pin-name">${pin.data.name}</span> 
+              <button onclick="showEditPanel('${id}')">✏️</button>`;
             list.appendChild(row);
           }
         }
 
         title.onclick = () => {
           list.style.display = list.style.display === "none" ? "block" : "none";
+          toggle.textContent = list.style.display === "none" ? "🔽" : "🔼";
         };
 
+        title.append(layerName, toggle);
         layersDiv.appendChild(title);
         layersDiv.appendChild(list);
       }
@@ -142,20 +161,31 @@
       refreshLayerPanel();
     }
 
-    window.moveMarker = function(id, newLayer) {
+    window.showEditPanel = function(id) {
+      currentEditId = id;
       const item = markers[id];
-      const oldLayer = item.data.layer;
-      if (layers[oldLayer]) layers[oldLayer].removeLayer(item.marker);
-      if (!layers[newLayer]) layers[newLayer] = L.layerGroup().addTo(map);
-      layers[newLayer].addLayer(item.marker);
-      item.data.layer = newLayer;
-      refreshLayerPanel();
+      const panel = document.getElementById("editPanel");
+      document.getElementById("editName").value = item.data.name;
+      document.getElementById("editDesc").value = item.data.description;
+      document.getElementById("editLayer").value = item.data.layer;
+      panel.style.display = "block";
     };
 
-    window.editMarker = function(id, field, value) {
+    window.saveEdit = function() {
+      const id = currentEditId;
       const item = markers[id];
-      item.data[field] = value;
+      item.data.name = document.getElementById("editName").value;
+      item.data.description = document.getElementById("editDesc").value;
+      const newLayer = document.getElementById("editLayer").value;
+      if (item.data.layer !== newLayer) {
+        if (layers[item.data.layer]) layers[item.data.layer].removeLayer(item.marker);
+        if (!layers[newLayer]) layers[newLayer] = L.layerGroup().addTo(map);
+        layers[newLayer].addLayer(item.marker);
+        item.data.layer = newLayer;
+      }
       item.marker.bindPopup("<b>" + item.data.name + "</b><br>" + item.data.description);
+      document.getElementById("editPanel").style.display = "none";
+      refreshLayerPanel();
     };
 
     window.exportToKML = function() {
@@ -192,7 +222,13 @@
   <button id="login">🔐 Zaloguj się przez Google</button>
   <div id="adminPanel">
     <button onclick="exportToKML()">💾 Eksportuj do KML</button>
-    <p>Kliknij na mapę, aby dodać nową pinezkę</p>
+  </div>
+  <div id="editPanel">
+    <h4>✏️ Edycja pinezki</h4>
+    <label>Nazwa:<br><input id="editName" /></label><br>
+    <label>Opis:<br><textarea id="editDesc" rows="3" style="width:100%;"></textarea></label><br>
+    <label>Warstwa:<br><input id="editLayer" /></label><br>
+    <button onclick="saveEdit()">✅ Zapisz</button>
   </div>
   <div id="layers"></div>
   <div id="map"></div>
